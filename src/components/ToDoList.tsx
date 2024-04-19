@@ -1,27 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import 'bootstrap/dist/css/bootstrap.min.css';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 
-const supabaseUrl = 'https://ismbrwqkcootieaguzwa.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlzbWJyd3FrY29vdGllYWd1endhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTI1NTQyNDcsImV4cCI6MjAyODEzMDI0N30.fEo-ddluC6l2HNPqIjcHBFHTYdIWoE8vjfjIX9KPbPI';
-const supabase = createClient(supabaseUrl, supabaseKey);
+interface Props {
+  supabase: SupabaseClient;
+  user: any;
+}
 
-const ToDoList: React.FC = () => {
+const ToDoList: React.FC<Props> = ({ supabase, user }) => {
   const [data, setData] = useState<any[]>([]);
   const [TextInput, setTextInput] = useState('');
   const [flag, setFlag] = useState(true);
-  const [id_list, setid_list] = useState('');
+  const [id_list, setid_list] = useState<number>(0);
 
   function ifTextChange(e: React.ChangeEvent<HTMLInputElement>) {
     setTextInput(e.target.value);
   }
 
   const fetchData = async () => {
+    
     try {
       const { data, error } = await supabase
         .from('table_todolist')
-        .select('*');
+        .select('*')
+        .eq( 'id_User' , user.id );
       if (error) {
         console.error('Error fetching data:', error.message);
       } else {
@@ -30,35 +32,51 @@ const ToDoList: React.FC = () => {
     } catch (error) {
       console.error('Error fetching data:', (error as Error).message);
     }
+
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if(user !== '') {
+      fetchData();
+    }
+  });
 
   //thêm
   const addList = async (val: String) => {
-    setTextInput('');
-    var e = 0;
-    const runtime = (id: any) => { id > e && (e = id); };
-    data.forEach((item: any) => runtime(item.id));
-    e++;
-    try {
-      const { data, error } = await supabase
-        .from('table_todolist')
-        .insert([
-          { id: e, name: val, status: false, star: false },
-        ])
-        .select();
-      if (error) {
-        console.error('Error:', error.message);
-      } else {
-        setData(data);
+    if(user !== '') {
+      setTextInput('');
+      var e = 0;
+      const runtime = (id: any) => { id > e && (e = id); };
+      try {
+        const { data, error } = await supabase
+          .from('table_todolist')
+          .select('*')
+        if (error) {
+          console.error('Error fetching data:', error.message);
+        } else {
+          data.forEach((item: any) => runtime(item.id));
+        }
+      } catch (error) {
+        console.error('Error fetching data:', (error as Error).message);
       }
-    } catch (error) {
-      console.error('Error:', (error as Error).message);
+      e++;
+      try {
+        const { data, error } = await supabase
+          .from('table_todolist')
+          .insert([
+            { id: e, name: val, status: false, star: false, id_User: user.id },
+          ])
+          .select();
+        if (error) {
+          console.error('Error:', error.message);
+        } else {
+          setData(data);
+        }
+      } catch (error) {
+        console.error('Error:', (error as Error).message);
+      }
+      fetchData();
     }
-    fetchData();
   }
 
   //sửa
@@ -103,76 +121,90 @@ const ToDoList: React.FC = () => {
     setFlag(!flag);
     setid_list(itemId);
     setTextInput(newName);
+    fetchData();
   };
 
   //hủy sửa
   const changeNameCancel = () => {
     setFlag(!flag);
-    setid_list('-1');
+    setid_list(0);
     setTextInput('');
+    
   };
 
+  //check
+  const check = (id:number) => {
+    if(flag === false && id === id_list) {
+      return false;
+    }
+    else {
+      return true;
+    }
+  };
+
+
+  
   return (
     <>
-      <div className="container">
-        <center className="form-control">
-          <div className="row ">
-            <div className="col-md-10">
-              <input
-                type="text"
-                value={TextInput}
-                onChange={ifTextChange}
-                className="form-control"
-                placeholder="Thêm việc cần làm..."
-                aria-describedby="helpId" />
-              <small id="helpId" className="text-muted">Tác vụ</small>
-            </div>
-            <div className="col-md-2">
-              <div>
-                <button
-                  hidden={!flag}
-                  type="button"
-                  disabled={!TextInput}
-                  onClick={() => addList(TextInput)}
-                  className="btn btn-primary"
-                >Thêm
-                </button>
-                <button
-                  hidden={flag}
-                  type="button"
-                  disabled={!TextInput}
-                  onClick={() => updateList(TextInput)}
-                  className="btn btn-primary"
-                >Sửa
-                </button>
-              </div>
-            </div>
+      <p className="mt-4 mb-2 text-xl text-center"><b>TodoApp</b></p>
+      <div className="flex justify-center">
+        <div className="grid grid-cols-12 gap-4">
+          <div className="col-span-10">
+            <input
+              type="text"
+              value={TextInput}
+              onChange={ifTextChange}
+              className="w-[400px] px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:border-blue-500"
+              placeholder="Thêm việc cần làm..."
+              aria-describedby="helpId"
+            /><br/>
+            <small id="helpId" className="text-gray-500">Tác vụ</small>
           </div>
-        </center>
-      </div>
-      <h3>Dữ liệu từ Supabase</h3>
-      <ul>
-        {data.slice().reverse().map((item: any) => (
-          <li key={item.id}>
-            {item.name}
-            <button 
-              onClick={() => 1}
-              >Xong
-            </button>
-            <button 
-              onClick={() => changeName(item.id, item.name)}
+          <div className="col-span-2 flex items-center">
+            <button
               hidden={!flag}
-              >Sửa
-            </button>
-            <button 
-              onClick={() => changeNameCancel()}
+              type="submit"
+              disabled={!TextInput}
+              onClick={() => addList(TextInput)}
+              className="mb-6 w-full px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:bg-blue-600"
+            >Thêm</button>
+            <button
               hidden={flag}
-              >Hủy
-            </button>
-            <button 
-              onClick={() => deleteFromID(item.id)}
-              >Xóa
-            </button>
+              type="submit"
+              disabled={!TextInput}
+              onClick={() => updateList(TextInput)}
+              className="mb-6 w-full px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:bg-blue-600"
+            >Sửa</button>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-4 mb-2 text-xl text-center ">Dữ liệu từ Supabase</p>
+      <ul className="justify-center grid">
+        {data.slice().reverse().map((item: any) => (
+          <li key={item.id} className="mb-2">
+
+              <span>{item.name}</span>
+
+              <button
+                onClick={() => 1}
+                className="ml-2 px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+              >Xong</button>
+              <button
+                onClick={() => changeName(item.id, item.name)}
+                hidden={!flag}
+                className="ml-2 px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >Sửa</button>
+              <button
+                onClick={() => changeNameCancel()}
+                hidden={check(item.id)}
+                className="ml-2 px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+              >Hủy</button>
+              <button
+                onClick={() => deleteFromID(item.id)}
+                className="ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+              >Xóa</button>
+
           </li>
         ))}
       </ul>
